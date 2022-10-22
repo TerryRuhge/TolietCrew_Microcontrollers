@@ -33,7 +33,7 @@ class ServerCallbacks: public BLEServerCallbacks {
 void setup() {
   Serial.begin(115200);
 
-  BLEDevice::init("MyESP32"); // Name your BLE Device
+  BLEDevice::init("Soap_Disp"); // Name your BLE Device
   BLEServer *MyServer = BLEDevice::createServer();  //Create the BLE Server
   MyServer->setCallbacks(new ServerCallbacks());  // Set the function that handles server callbacks
   BLEService *customService = MyServer->createService(serviceID); // Create the BLE Service
