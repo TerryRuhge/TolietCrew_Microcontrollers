@@ -55,7 +55,8 @@ void loop() {
   //Serial.println(total_int);
   if(change) {
     Serial.println("Attempting Update");
-    String temp = MAC + type + String(total_int);
+    //String temp = MAC + type + String(total_int);
+    String temp = type + String(total_int);
     char buffer[temp.length()+1];
     temp.toCharArray(buffer,temp.length() + 1);
     customCharacteristic.setValue((char*)&buffer);
@@ -67,6 +68,8 @@ void loop() {
 }
 
 void dispensed() {
-  total_int = total_int + 1;
-  change = 1;
+  if (change == 0) {
+    total_int = total_int + 1;
+    change = 1;
+  }  
 }

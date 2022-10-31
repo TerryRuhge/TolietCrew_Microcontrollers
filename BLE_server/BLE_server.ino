@@ -94,7 +94,7 @@ void controlPeripheral(BLEDevice peripheral) {
     Serial.println("* Peripheral device does not have gesture_type characteristic!");
     peripheral.disconnect();
     return;
-  } else if (!gestureCharacteristic.canWrite()) {
+  } else if (!gestureCharacteristic.canRead()) {
 
     Serial.println("* Peripheral does not have a writable gesture_type characteristic!");
     peripheral.disconnect();
@@ -102,12 +102,33 @@ void controlPeripheral(BLEDevice peripheral) {
   }
 
   while (peripheral.connected()) {
-
-      Serial.println("Connected...");
-      delay(1000);
-      Serial.println(" ");
+    if(!gestureCharacteristic.valueUpdated() ) {
+      while(gestureCharacteristic.canRead()) {
+        gestureCharacteristic.read();
+        if(gestureCharacteristic.valueLength() > 0) {
+          char buffer[gestureCharacteristic.valueLength()] = {};
+          gestureCharacteristic.readValue(buffer, gestureCharacteristic.valueLength());
+          for (int i = 0; i < gestureCharacteristic.valueLength(); i++) {
+            Serial.print(buffer[i]);          
+          }
+          Serial.println(" ");
+        }        
+      }
+    }    
   }
 
   Serial.println("- Peripheral device disconnected!");
 
 }
+
+
+
+
+
+
+
+
+
+
+
+
