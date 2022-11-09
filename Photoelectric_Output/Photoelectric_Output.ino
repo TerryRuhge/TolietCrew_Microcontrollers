@@ -1,4 +1,4 @@
-int inPin = 7;
+int inPin = 37;
 
 void setup() {
   // put your setup code here, to run once:
@@ -8,6 +8,6 @@ void setup() {
 
 void loop() {
   // put your main code here, to run repeatedly:
-  Serial.println(digitalRead(inPin));
-  delay(100);
+  Serial.println(digitalRead(inPin),DEC);
+  delay(500);
 }
