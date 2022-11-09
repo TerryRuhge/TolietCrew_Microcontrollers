@@ -7,6 +7,12 @@ char ssid[] = SECRET_SSID;        // your network SSID (name)
 char pass[] = SECRET_PASS;    // your network password (use for WPA, or use as key for WEP)
 int status = WL_IDLE_STATUS;     // the Wifi radio's status
 
+
+char server[] = "g5wdbckuah.execute-api.us-east-1.amazonaws.com";
+
+//IPAddress server(108,138,159,23); //Ip of above address
+WiFiSSLClient client;
+
 void printData() {
   Serial.println("Board Information:");
   // print your board's IP address:
@@ -49,6 +55,17 @@ void setup() {
   printData();
   Serial.println("----------------------------------------");
 
+  Serial.println("\nStarting connection to server...");
+  // if you get a connection, report back via serial:
+  if (client.connect(server, 443)) {
+    Serial.println("connected to server");
+    // Make a HTTP request:
+    client.println("GET /Prod/dispensers?dispenser_id=-1");
+    client.println("Host: g5wdbckuah.execute-api.us-east-1.amazonaws.com");
+    client.println("Connection: close");
+    client.println();
+  }
+
 }
 
 void loop() {
@@ -56,5 +73,17 @@ void loop() {
  delay(10000);
  printData();
  Serial.println("----------------------------------------");
+  while(client.available()) {
+    char c = client.read();
+    Serial.write(c);     
+  }
 
+  if (!client.connected()) {
+    Serial.println();
+    Serial.println("disconnecting from server.");
+    client.stop();
+
+    // do nothing forevermore:
+    while (true);
+  }
 }
