@@ -23,7 +23,7 @@ void printData() {
   long rssi = WiFi.RSSI();
   Serial.print("signal strength (RSSI):");
   Serial.println(rssi);
-
+}
 
 
 void setup() {
