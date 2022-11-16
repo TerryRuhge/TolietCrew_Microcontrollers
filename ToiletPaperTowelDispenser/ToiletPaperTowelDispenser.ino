@@ -4,11 +4,12 @@
 #include <BLE2902.h>
 #include <HCSR04.h>
 
-const int trigPin = 9;
-const int echoPin = 10;
+const int trigPin = 13;
+const int echoPin = 2;
 
 long duration;
 long distance;
+long percentile;
 /* define the characteristic and it's propeties */
 BLECharacteristic customCharacteristic(
   BLEUUID("19b10001-e8f2-537e-4f6c-d104768a1214"),
@@ -70,7 +71,27 @@ void loop() {
   duration = pulseIn(echoPin, HIGH);
   distance = duration*0.034/2;
 
+  if ((distance >= 6) && (distance <= 12)) {
+    percentile = 100;
+  } else if ((distance >= 4) && (distance < 6)) {
+    percentile = 75;
+  } else if ((distance >= 2) && (distance < 4)) {
+    percentile = 50;
+  } else if ((distance >= 0) && (distance < 2)) {
+    percentile = 25;
+  }
+  
+  String temp = String(percentile);
+  char buffer[temp.length()+1];
+  temp.toCharArray(buffer,temp.length() + 1);
+  customCharacteristic.setValue((char*)&buffer);
+  customCharacteristic.notify(); 
+
   Serial.print("Distance: ");
   Serial.println(distance);
+  Serial.print("Percentile: ");
+  Serial.println(percentile);
+ 
+  delay(1000);
   
 }
