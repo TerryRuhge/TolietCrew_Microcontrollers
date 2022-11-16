@@ -9,7 +9,8 @@ int status = WL_IDLE_STATUS;     // the Wifi radio's status
 
 
 char server[] = "g5wdbckuah.execute-api.us-east-1.amazonaws.com";
-
+String url = "/Prod";
+//const char fingerprint[] PROGEM = "64 60 D8 6B 33 A2 62 1C 31 F9 1F 5A C8 F4 07 6F 9B A6 81 F6";
 //IPAddress server(108,138,159,23); //Ip of above address
 WiFiSSLClient client;
 
@@ -57,10 +58,10 @@ void setup() {
 
   Serial.println("\nStarting connection to server...");
   // if you get a connection, report back via serial:
-  if (client.connect(server, 443)) {
+  if (client.connectSSL(server, 443)) {
     Serial.println("connected to server");
     // Make a HTTP request:
-    client.println("GET /Prod/dispensers?dispenser_id=-1");
+    client.println(String("GET ") + url + "/dispensers?" + " HTTP/1.1");
     client.println("Host: g5wdbckuah.execute-api.us-east-1.amazonaws.com");
     client.println("Connection: close");
     client.println();
@@ -71,7 +72,6 @@ void setup() {
 void loop() {
   // check the network connection once every 10 seconds:
  delay(10000);
- printData();
  Serial.println("----------------------------------------");
   while(client.available()) {
     char c = client.read();
