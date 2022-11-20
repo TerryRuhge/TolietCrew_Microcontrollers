@@ -27,7 +27,9 @@
 
 /* Defines seconds for deepsleep function */
 #define uS_TO_S_FACTOR 1000000
-#define TIME_TO_SLEEP 5
+#define TIME_TO_SLEEP 5 //Time to sleep in seconds
+#define CONNECTION_ATTEMPT_TIME_OUT = 300000 //Time to attempt connection in milliseconds
+#define CONNECTION_TIME_OUT = 300000 //Time to be connected without disconnect in milliseconds
 
 
 
@@ -185,7 +187,7 @@ void send_update() {
     }
     
     //If hasn't been connected to and been longer than desired time end now;
-    if(!connected && millis() - attemptStart > 1 * 60 * 1000) {
+    if(!connected && millis() - attemptStart > CONNECTION_ATTEMPT_TIME_OUT) {
       Serial.println("Connection took too long ending attempt");
       break;
     }
@@ -197,7 +199,7 @@ void send_update() {
       client_disconnected = 1;      
     }
     //Exit loop once device has been disconnected after not being disconnected from client for too long
-    if(connected && millis() - connectionStart > 1 * 60 * 1000) {
+    if(connected && millis() - connectionStart > CONNECTION_TIME_OUT) {
       Serial.println("Disconnected by Timeout");
       connected = 0;
       client_disconnected = 1;    
