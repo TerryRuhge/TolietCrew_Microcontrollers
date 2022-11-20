@@ -7,6 +7,7 @@ char ssid[] = SECRET_SSID;        // your network SSID (name)
 char pass[] = SECRET_PASS;    // your network password (use for WPA, or use as key for WEP)
 int status = WL_IDLE_STATUS;     // the Wifi radio's status
 
+byte mac[6];
 
 char server[] = "g5wdbckuah.execute-api.us-east-1.amazonaws.com";
 String url = "/Prod";
@@ -41,6 +42,8 @@ void setup() {
   // attempt to connect to Wifi network:
   while (status != WL_CONNECTED) {
     Serial.print("Attempting to connect to network: ");
+    WiFi.macAddress(mac)
+    Serial.println(String(mac));
     Serial.println(ssid);
     // Connect to WPA/WPA2 network:
     status = WiFi.begin(ssid, pass);
