@@ -3,6 +3,14 @@
 #include <BLEUtils.h>
 #include <BLE2902.h>
 
+#include <Wire.h>
+#include <Protocentral_FDC1004.h>
+
+#define UPPER_BOUND  0X4000                 // max readout capacitance
+#define LOWER_BOUND  (-1 * UPPER_BOUND)
+#define CHANNEL 1                          // channel to be read
+#define MEASURMENT 0                       // measurment channel
+
 /* define the characteristic and it's propeties */
 BLECharacteristic customCharacteristic(
   BLEUUID("19b10001-e8f2-537e-4f6c-d104768a1214"),
@@ -27,8 +35,6 @@ class ServerCallbacks: public BLEServerCallbacks {
 const byte interruptPin = 2; //Pin Connected to Soap Dispensor motor
 volatile int total_int = 0;
 volatile boolean change = 1;
-String MAC = "010101010101010101010101";
-String type = "85";
 
 void setup() {
   // Set up Printing
@@ -48,6 +54,9 @@ void setup() {
   MyServer->getAdvertising()->start();  // Start the server/advertising
 
   Serial.println("Waiting for a client to connect....");
+
+  Wire.begin();        //i2c begin
+  Serial.begin(115200); // serial baud rate
 }
 
 void loop() {
@@ -62,8 +71,35 @@ void loop() {
     customCharacteristic.setValue((char*)&buffer);
     customCharacteristic.notify();    
     Serial.println(total_int);
-    change = !change;
-    
+
+    FDC.configureMeasurementSingle(MEASURMENT, CHANNEL, capdac);
+    Serial.println(MEASURMENT);
+    FDC.triggerSingleMeasurement(MEASURMENT, FDC1004_100HZ);
+    Serial.println(MEASURMENT);
+    Serial.println(MEASURMENT);
+
+    //wait for completion
+    delay(15);
+    uint16_t value[2];
+    if (! FDC.readMeasurement(MEASURMENT, value)) {
+      int16_t msb = (int16_t) value[0];
+      int32_t capacitance = ((int32_t)457) * ((int32_t)msb); //in attofarads
+      capacitance /= 1000;   //in femtofarads
+      capacitance += ((int32_t)3028) * ((int32_t)capdac);
+
+      Serial.print((((float)capacitance/1000)),4);
+      Serial.print("  pf \n");
+
+      if (msb > UPPER_BOUND) {
+        if (capdac < FDC1004_CAPDAC_MAX)
+          capdac++;
+      }
+      else if (msb < LOWER_BOUND) {
+        if (capdac > 0)
+          capdac--;
+      }
+      change = !change;
+    }
   }
 }
 
