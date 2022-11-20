@@ -213,3 +213,19 @@ void dispensed() {
     change = 1;
   }  
 }
+
+bool ble_send() {
+    return 0;
+}
+
+float get_one_cap_read() {
+  return 0;
+}
+
+float get_avg_cap_read(int n) {
+  return 0;  
+}
+
+int get_level() {
+  return 0;  
+}
