@@ -1,25 +1,34 @@
+/* Name: SoapDispenser.ino                      */
+/* Author: Terry Ruhge                          */
+/* Sources:                                     */
+/* Last updated: 11/19/2022                     */
+/* Descrption:                                  */
+
+//Libraries for BLE service for ESP32
 #include <BLEDevice.h>
 #include <BLEServer.h>
 #include <BLEUtils.h>
 #include <BLE2902.h>
 
+//Libraries for Break Capacitance
 #include <Wire.h>
 #include <Protocentral_FDC1004.h>
 
+/* Definitions for Breakout Capacitance Service */
 #define UPPER_BOUND  0X4000                 // max readout capacitance
-#define LOWER_BOUND  (-1 * UPPER_BOUND)
-#define CHANNEL 1                          // channel to be read
-#define MEASURMENT 0                       // measurment channel
+#define LOWER_BOUND  (-1 * UPPER_BOUND)     // min readout capacitance
+#define CHANNEL 1                           // channel to be read
+#define MEASURMENT 0                        // measurment channel
 
-/* define the characteristic and it's propeties */
+/* UUID characteristics & properties for Soap Dispenser */
 BLECharacteristic customCharacteristic(
-  BLEUUID("19b10001-e8f2-537e-4f6c-d104768a1214"),
+  BLEUUID("a1efe119-fe3e-4d94-a542-fcb2fb4bb6f5"),
   BLECharacteristic::PROPERTY_READ |
   BLECharacteristic::PROPERTY_NOTIFY
 );
 
-/* define the UUID that our custom service will use */
-#define serviceID BLEUUID("19b10001-e8f2-537e-4f6c-d104768a1237")
+/* service UUID for entire Bluetooth TolietCrew service */
+#define serviceID BLEUUID("cd0f82b0-d59f-4c9b-8575-467ce047aa9e")
 
 /* This function handles server callbacks */
 bool deviceConnected = false;
@@ -37,13 +46,19 @@ volatile int total_int = 0;
 volatile boolean change = 1;
 
 void setup() {
-  // Set up Printing
-  Serial.begin(115200);
-  // Set up interrupt Pin
+  // Set up Capacitance Breakout
+  Wire.begin(); // i2c begin
+  
+  // Set up Interrupt for counter
   pinMode(interruptPin, INPUT_PULLUP);
   attachInterrupt(digitalPinToInterrupt(interruptPin), dispensed, FALLING);
+
+  // Set up Printing
+  Serial.begin(115200);
   
-  BLEDevice::init("Soap_Disp"); // Name your BLE Device
+
+  //BLE Service
+  BLEDevice::init("Soap_Dispenser"); // Soap Dispenser Service
   BLEServer *MyServer = BLEDevice::createServer();  //Create the BLE Server
   MyServer->setCallbacks(new ServerCallbacks());  // Set the function that handles server callbacks
   BLEService *customService = MyServer->createService(serviceID); // Create the BLE Service
@@ -54,9 +69,6 @@ void setup() {
   MyServer->getAdvertising()->start();  // Start the server/advertising
 
   Serial.println("Waiting for a client to connect....");
-
-  Wire.begin();        //i2c begin
-  Serial.begin(115200); // serial baud rate
 }
 
 void loop() {
