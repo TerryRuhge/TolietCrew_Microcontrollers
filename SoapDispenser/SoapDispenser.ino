@@ -85,7 +85,7 @@ char result[100];
 
 void setup() {
   // Set up Capacitance Breakout
-  //Wire.begin(); // i2c begin
+  Wire.begin(); // i2c begin
   
   // Set up Interrupt for counter
   //pinMode(interruptPin, INPUT_PULLUP);
@@ -96,24 +96,14 @@ void setup() {
 
   //Take some time to open up the Serial Monitor
   delay(1000); 
-
-  //BLE Service
-  // BLEDevice::init("Soap_Dispenser"); // Soap Dispenser Service
-  // BLEServer *MyServer = BLEDevice::createServer();  //Create the BLE Server
-  // MyServer->setCallbacks(new ServerCallbacks());  // Set the function that handles server callbacks
-  // BLEService *customService = MyServer->createService(serviceID); // Create the BLE Service
-  // customService->addCharacteristic(&customCharacteristic);  // Create a BLE Characteristic
-  // customCharacteristic.addDescriptor(new BLE2902());  // Create a BLE Descriptor
-  // MyServer->getAdvertising()->addServiceUUID(serviceID);  // Configure Advertising
-  // customService->start(); // Start the service  
-  // MyServer->getAdvertising()->start();  // Start the server/advertising
-  // Serial.println("Waiting for a client to connect....");
+  
   ++bootCount;  
   Serial.println("Boot number: " + String(bootCount));   
 
   print_wakeup_reason(); 
 
-  Serial.println("Going to sleep now");  
+  send_update();
+   
   esp_sleep_enable_timer_wakeup(TIME_TO_SLEEP * uS_TO_S_FACTOR);
   Serial.println("Setup ESP32 to sleep for every " + String(TIME_TO_SLEEP) +
   " Seconds");
@@ -126,53 +116,100 @@ void setup() {
 }
 
 void loop() {
-//   // put your main code here, to run repeatedly:
-//   if(change) {
-//     //interrupt was detected
-//     Serial.println("Attempting Update");
+
+}
+
+void send_update() {
+  //BLE Service
+  BLEDevice::init("Soap_Dispenser"); // Soap Dispenser Service
+  BLEServer *MyServer = BLEDevice::createServer();  //Create the BLE Server
+  MyServer->setCallbacks(new ServerCallbacks());  // Set the function that handles server callbacks
+  BLEService *customService = MyServer->createService(serviceID); // Create the BLE Service
+  customService->addCharacteristic(&customCharacteristic);  // Create a BLE Characteristic
+  customCharacteristic.addDescriptor(new BLE2902());  // Create a BLE Descriptor
+  MyServer->getAdvertising()->addServiceUUID(serviceID);  // Configure Advertising
+  customService->start(); // Start the service  
+  MyServer->getAdvertising()->start();  // Start the server/advertising
+  Serial.println("Waiting for a client to connect....");
+  bool connected = 0;
+  bool client_disconnected = 0;
+  unsigned long attemptStart = millis();  
+  unsigned long connectionStart;  
+  while(!client_disconnected)  {
+    if(deviceConnected) {
+      if(!connected) {
+        Serial.println("Connected to Client");
+        //interrupt was detected
+        connectionStart = millis();
+        Serial.println("Attempting Update");
+      }
+      
+      output = String(total_int);
+      char buffer[output.length()+1];
+      output.toCharArray(buffer,output.length() + 1);
+      customCharacteristic.setValue((char*)&buffer);
+      customCharacteristic.notify();    
+      Serial.println(total_int);
+
+      
+      FDC.configureMeasurementSingle(MEASURMENT, CHANNEL, capdac);
+      Serial.println(MEASURMENT);
+      FDC.triggerSingleMeasurement(MEASURMENT, FDC1004_100HZ);
+      Serial.println(MEASURMENT);
+      Serial.println(MEASURMENT);
+
+      //wait for completion
+      delay(15);
+      uint16_t value[2];
+      if (! FDC.readMeasurement(MEASURMENT, value)) {
+        int16_t msb = (int16_t) value[0];
+        int32_t capacitance = ((int32_t)457) * ((int32_t)msb); //in attofarads
+        capacitance /= 1000;   //in femtofarads
+        capacitance += ((int32_t)3028) * ((int32_t)capdac);
+
+        Serial.print((((float)capacitance/1000)),4);
+        Serial.print("  pf \n");
+
+        if (msb > UPPER_BOUND) {
+          if (capdac < FDC1004_CAPDAC_MAX)
+            capdac++;
+        }
+        else if (msb < LOWER_BOUND) {
+          if (capdac > 0)
+            capdac--;
+        }
+        change = !change;
+      }
+      Serial.println("Update Complete");
+      connected = 1;
+    }
     
-//     output = String(total_int);
-//     char buffer[output.length()+1];
-//     output.toCharArray(buffer,output.length() + 1);
-//     customCharacteristic.setValue((char*)&buffer);
-//     customCharacteristic.notify();    
-//     Serial.println(total_int);
+    //If hasn't been connected to and been longer than desired time end now;
+    if(!connected && millis() - attemptStart > 1 * 60 * 1000) {
+      Serial.println("Connection took too long ending attempt");
+      break;
+    }
 
-//     FDC.configureMeasurementSingle(MEASURMENT, CHANNEL, capdac);
-//     Serial.println(MEASURMENT);
-//     FDC.triggerSingleMeasurement(MEASURMENT, FDC1004_100HZ);
-//     Serial.println(MEASURMENT);
-//     Serial.println(MEASURMENT);
+    //Exit loop once device has been disconnected by client
+    if(connected && !deviceConnected) {
+      Serial.println("Disconnected by client");
+      connected = 0;
+      client_disconnected = 1;      
+    }
+    //Exit loop once device has been disconnected after not being disconnected from client for too long
+    if(connected && millis() - connectionStart > 1 * 60 * 1000) {
+      Serial.println("Disconnected by Timeout");
+      connected = 0;
+      client_disconnected = 1;    
+    }    
+  }
+  
+  client_disconnected = 0;  
+}
 
-//     //wait for completion
-//     delay(15);
-//     uint16_t value[2];
-//     if (! FDC.readMeasurement(MEASURMENT, value)) {
-//       int16_t msb = (int16_t) value[0];
-//       int32_t capacitance = ((int32_t)457) * ((int32_t)msb); //in attofarads
-//       capacitance /= 1000;   //in femtofarads
-//       capacitance += ((int32_t)3028) * ((int32_t)capdac);
-
-//       Serial.print((((float)capacitance/1000)),4);
-//       Serial.print("  pf \n");
-
-//       if (msb > UPPER_BOUND) {
-//         if (capdac < FDC1004_CAPDAC_MAX)
-//           capdac++;
-//       }
-//       else if (msb < LOWER_BOUND) {
-//         if (capdac > 0)
-//           capdac--;
-//       }
-//       change = !change;
-//     }
-//     Serial.println("Update Complete");
-//   }
-// }
-
-// void dispensed() {
-//   if (change == 0) {
-//     total_int = total_int + 1;
-//     change = 1;
-//   }  
+void dispensed() {
+  if (change == 0) {
+    total_int = total_int + 1;
+    change = 1;
+  }  
 }
