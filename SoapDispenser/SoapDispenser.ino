@@ -28,8 +28,8 @@
 /* Defines seconds for deepsleep function */
 #define uS_TO_S_FACTOR 1000000
 #define TIME_TO_SLEEP 5 //Time to sleep in seconds
-#define CONNECTION_ATTEMPT_TIME_OUT = 300000 //Time to attempt connection in milliseconds
-#define CONNECTION_TIME_OUT = 300000 //Time to be connected without disconnect in milliseconds
+#define CONNECTION_ATTEMPT_TIME_OUT 300000 //Time to attempt connection in milliseconds
+#define CONNECTION_TIME_OUT 300000 //Time to be connected without disconnect in milliseconds
 
 
 
@@ -85,6 +85,9 @@ FDC1004 FDC;
 int capdac = 0;
 char result[100];
 
+float fullcapacitance = 0;
+float emptyCapacitance = 7.03;
+
 void setup() {
   // Set up Capacitance Breakout
   Wire.begin(); // i2c begin
@@ -98,6 +101,11 @@ void setup() {
 
   //Take some time to open up the Serial Monitor
   delay(1000); 
+
+  //setup full and empty capacitance
+  if(bootCount == 0) {
+    fullcapacitance = get_avg_cap_read(10) + 0.03;
+  }  
   
   ++bootCount;  
   Serial.println("Boot number: " + String(bootCount));   
@@ -121,8 +129,21 @@ void loop() {
 
 }
 
+//For initial drop in capacitance
+void detectChange() {
+    
+}
+
 void send_update() {
   //BLE Service
+  
+  int soap_lvl = get_level();
+  Serial.printf("\nSaop Level: %d", soap_lvl);
+  Serial.print("%\n");
+  ble_send(soap_lvl);
+}
+
+bool ble_send(int soap_lvl) {
   BLEDevice::init("Soap_Dispenser"); // Soap Dispenser Service
   BLEServer *MyServer = BLEDevice::createServer();  //Create the BLE Server
   MyServer->setCallbacks(new ServerCallbacks());  // Set the function that handles server callbacks
@@ -133,56 +154,30 @@ void send_update() {
   customService->start(); // Start the service  
   MyServer->getAdvertising()->start();  // Start the server/advertising
   Serial.println("Waiting for a client to connect....");
+
+
   bool connected = 0;
   bool client_disconnected = 0;
   unsigned long attemptStart = millis();  
-  unsigned long connectionStart;  
+  unsigned long connectionStart; 
+  //Loop until connection was connected and disconnected
   while(!client_disconnected)  {
+    //Client Connected
     if(deviceConnected) {
+      //First Time Connection
       if(!connected) {
         Serial.println("Connected to Client");
-        //interrupt was detected
         connectionStart = millis();
         Serial.println("Attempting Update");
       }
       
-      output = String(total_int);
+      //update output of BLE
+      output = String(soap_lvl);
       char buffer[output.length()+1];
       output.toCharArray(buffer,output.length() + 1);
       customCharacteristic.setValue((char*)&buffer);
       customCharacteristic.notify();    
-      Serial.println(total_int);
-
-      
-      FDC.configureMeasurementSingle(MEASURMENT, CHANNEL, capdac);
-      Serial.println(MEASURMENT);
-      FDC.triggerSingleMeasurement(MEASURMENT, FDC1004_100HZ);
-      Serial.println(MEASURMENT);
-      Serial.println(MEASURMENT);
-
-      //wait for completion
-      delay(15);
-      uint16_t value[2];
-      if (! FDC.readMeasurement(MEASURMENT, value)) {
-        int16_t msb = (int16_t) value[0];
-        int32_t capacitance = ((int32_t)457) * ((int32_t)msb); //in attofarads
-        capacitance /= 1000;   //in femtofarads
-        capacitance += ((int32_t)3028) * ((int32_t)capdac);
-
-        Serial.print((((float)capacitance/1000)),4);
-        Serial.print("  pf \n");
-
-        if (msb > UPPER_BOUND) {
-          if (capdac < FDC1004_CAPDAC_MAX)
-            capdac++;
-        }
-        else if (msb < LOWER_BOUND) {
-          if (capdac > 0)
-            capdac--;
-        }
-        change = !change;
-      }
-      Serial.println("Update Complete");
+      //Serial.println("Update Complete");
       connected = 1;
     }
     
@@ -205,29 +200,87 @@ void send_update() {
       client_disconnected = 1;    
     }    
   }
-  
-  client_disconnected = 0;  
-}
-
-void dispensed() {
-  if (change == 0) {
-    total_int = total_int + 1;
-    change = 1;
-  }  
-}
-
-bool ble_send() {
-    return 0;
-}
-
-float get_one_cap_read() {
+  //Reset Value (Shouldn't matter since we are going into deep sleep)
+  client_disconnected = 0;
   return 0;
 }
 
+float get_one_cap_read() {
+  //configure Sensor
+  FDC.configureMeasurementSingle(MEASURMENT, CHANNEL, capdac);
+  Serial.println(MEASURMENT);
+  FDC.triggerSingleMeasurement(MEASURMENT, FDC1004_100HZ);
+
+  //wait for Configuration
+  delay(15);
+  uint16_t value[2];
+
+  //If valid read then  
+  if (! FDC.readMeasurement(MEASURMENT, value)) {
+    //Convert to capacitance value
+    int16_t msb = (int16_t) value[0];
+    int32_t capacitance = ((int32_t)457) * ((int32_t)msb); //in attofarads
+    capacitance /= 1000;   //in femtofarads
+    capacitance += ((int32_t)3028) * ((int32_t)capdac);
+
+    //Print for Testing
+    Serial.print((((float)capacitance/1000)),4);
+    Serial.print("  pf \n");
+
+//Update Balance    
+    if (msb > UPPER_BOUND) {
+      if (capdac < FDC1004_CAPDAC_MAX)
+        capdac++;
+    }
+    else if (msb < LOWER_BOUND) {
+      if (capdac > 0)
+        capdac--;
+    }
+    return ((float)capacitance)/1000;         
+  }
+  //Measurement Could not be taken
+  return -1;
+}
+
 float get_avg_cap_read(int n) {
-  return 0;  
+  //make sure n is an acceptable value
+  if(n > 1) {
+    float avg_value = 0;
+    float max_value = emptyCapacitance / 2;
+    float min_value = fullcapacitance * 2;
+    //collect and average single measurements
+    for(int i = 0; i < n; i++) {
+      float current_cap_value = get_one_cap_read();
+      //Make sure range of values is acceptable      
+      if (min_value > current_cap_value)
+        min_value = current_cap_value;
+      if (max_value < current_cap_value)
+        max_value = current_cap_value;
+      avg_value = avg_value + current_cap_value/n;        
+    }
+    if(max_value - min_value > 0.15) {
+      //get next average to be less than current to prevent darastic recurrsion
+      return get_avg_cap_read(n - 1);    
+    } else {
+      return avg_value;      
+    }
+  }
+  return get_one_cap_read();
 }
 
 int get_level() {
-  return 0;  
+  //converts current capacitance level to battery level
+   int soap_lvl = 0;
+    float current_cap = get_avg_cap_read(10);
+    if (current_cap != -1) {
+      soap_lvl = round(((current_cap-emptyCapacitance)/(fullcapacitance-emptyCapacitance)) * 100);
+      //make sure level is witihin and includes (0-100)
+      if(soap_lvl > 100) {
+        soap_lvl = 100;
+      } else if(soap_lvl < 0) {
+        soap_lvl = 0;
+      }
+      return soap_lvl;
+    }  
+  return -1;  
 }
