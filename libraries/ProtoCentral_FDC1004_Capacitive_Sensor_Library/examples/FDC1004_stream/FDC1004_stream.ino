@@ -33,7 +33,7 @@
 
 #define UPPER_BOUND  0X4000                 // max readout capacitance
 #define LOWER_BOUND  (-1 * UPPER_BOUND)
-#define CHANNEL 1                          // channel to be read
+#define CHANNEL 0                          // channel to be read
 #define MEASURMENT 0                       // measurment channel
 
 int capdac = 0;
@@ -51,10 +51,8 @@ void loop()
 {
 
   FDC.configureMeasurementSingle(MEASURMENT, CHANNEL, capdac);
-  Serial.println(MEASURMENT);
   FDC.triggerSingleMeasurement(MEASURMENT, FDC1004_100HZ);
-  Serial.println(MEASURMENT);
-  Serial.println(MEASURMENT);
+
   //wait for completion
   delay(15);
   uint16_t value[2];
@@ -66,7 +64,7 @@ void loop()
     capacitance += ((int32_t)3028) * ((int32_t)capdac);
 
     Serial.print((((float)capacitance/1000)),4);
-    Serial.print("  pf \n");
+    Serial.print("  pf, ");
 
     if (msb > UPPER_BOUND)               // adjust capdac accordingly
 	{
