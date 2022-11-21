@@ -62,7 +62,7 @@ void print_wakeup_reason(){
 
 /* UUID characteristics & properties for Soap Dispenser */
 BLECharacteristic customCharacteristic(
-  BLEUUID("a1efe119-fe3e-4d94-a542-fcb2fb4bb6f5"),
+  BLEUUID("4fafc201-36e1-4688-b7f5-c5c9c331914b"),
   BLECharacteristic::PROPERTY_READ |
   BLECharacteristic::PROPERTY_NOTIFY
 );
